@@ -1,2 +1,2 @@
-model_checkpoint_path: "cp-val_acc-0.618750.ckpt"
-all_model_checkpoint_paths: "cp-val_acc-0.618750.ckpt"
+model_checkpoint_path: "cp-val_acc-0.693750.ckpt"
+all_model_checkpoint_paths: "cp-val_acc-0.693750.ckpt"

@@ -15,8 +15,8 @@ from tensorflow.python.keras.layers.normalization_v2 import BatchNormalization
 
 # 배치, 클래스 등 기본 설정
 Batch_size = 16
-img_h = 260
-img_w = 260
+img_h = 300
+img_w = 300
 num_classes = 4
 classes = [ 'cutest', # 0
             'prettyCute', # 1
@@ -114,13 +114,12 @@ valid_gen = valid_data_gen.flow_from_directory( validation_path,
 
 
 # 맞춤형 모델
-base_layer = hub.load("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b2/classification/2")
-base_layer = hub.KerasLayer("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b2/feature_vector/2", trainable=False)
+base_layer = hub.load("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b3/classification/2")
+base_layer = hub.KerasLayer("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b3/feature_vector/2", trainable=False)
 model = tf.keras.Sequential([
         base_layer,
-        Dropout(0.2),
-        Dense(units=64, activation='relu'),
-        Dropout(0.2),
+        Dense(units=256, activation='relu'),
+        Dropout(0.5),
         Dense(units=4, activation='softmax')
     ])
 
@@ -135,7 +134,7 @@ model.summary()
 # callback 함수 설정 : lrr, cp
 lrr = ReduceLROnPlateau(monitor='val_accuracy', 
                         factor=0.5, 
-                        patience=5, 
+                        patience=10, 
                         verbose=1, 
                         min_lr=0.00001 )
 
@@ -159,10 +158,13 @@ transfer_learning_history = model.fit( train_gen,
                                        steps_per_epoch=STEP_SIZE_TRAIN,
                                        validation_data=valid_gen,
                                        validation_steps=STEP_SIZE_VALID,
-                                       epochs=30,
+                                       epochs=60,
                                        callbacks=callbacks,
                                        class_weight=None
 )
+
+# model evaluate with valid set
+model.evaluate(valid_gen, steps=STEP_SIZE_VALID, verbose=1)
 
 # save model
 saved_model_path = os.path.join( file_dir_path, 'saved_model' )
@@ -170,47 +172,60 @@ model_num = len( os.listdir( saved_model_path ) )
 saved_model_name = os.path.join( saved_model_path, 'model_' + str(model_num) )
 model.save( saved_model_name )
 
-# 학습중 가장 높은 val_accuracy를 보였던 weights로 평가진행
+# 학습중 가장 높은 val_accuracy를 보였던 weights찾기
 weight_list = os.listdir( checkpoint_dir )
 best_weight_name = weight_list[-1].replace( '.index', '' )
 best_weight = os.path.join( checkpoint_dir, best_weight_name )
-model.load_weights(best_weight)
 
-# model evaluate with valid set
-model.evaluate(valid_gen, steps=STEP_SIZE_VALID, verbose=1)
-
-test_gen.reset()
-pred = model.predict( test_gen,
+# 모델로 평가하기 함수 정의
+def test_and_save( saved_model_name, best_weight_name ):
+    test_gen.reset()
+    pred = model.predict( test_gen,
                       steps=STEP_SIZE_TEST,
                       verbose=1)
 
-predicted_class_indices = np.argmax(pred,axis=1)
-filenames = test_gen.filenames 
-answer_list = []
-for filename in filenames : 
-      if filename.find( 'cutest' ) >= 0 :
-            answer_list.append( 0 )
-      elif filename.find( 'prettyCute' ) >= 0 :
-            answer_list.append( 1 )
-      elif filename.find( 'soso' ) >= 0 :
-            answer_list.append( 2 )
-      elif filename.find( 'ugly' ) >= 0 :
-            answer_list.append( 3 )
+    predicted_class_indices = np.argmax(pred,axis=1)
+    filenames = test_gen.filenames 
+    answer_list = []
+    for filename in filenames : 
+          if filename.find( 'cutest' ) >= 0 :
+                answer_list.append( 0 )
+          elif filename.find( 'prettyCute' ) >= 0 :
+                answer_list.append( 1 )
+          elif filename.find( 'soso' ) >= 0 :
+                answer_list.append( 2 )
+          elif filename.find( 'ugly' ) >= 0 :
+                answer_list.append( 3 )
 
-results = pd.DataFrame( {"Id" : filenames,
+    results = pd.DataFrame( {"Id" : filenames,
                          "prediction" : predicted_class_indices,
                          "answer" : answer_list
                         } )
 
-correct = 0
-for i, pred in enumerate ( predicted_class_indices ):
-      if pred == answer_list[i] : correct += 1
-      elif abs( pred - answer_list[i] ) == 1 : correct += 0.3
-      elif abs( pred - answer_list[i] ) == 3 : correct -= 0.5
+    correct = 0
+    for i, pred in enumerate ( predicted_class_indices ):
+          if pred == answer_list[i] : correct += 1
+          elif abs( pred - answer_list[i] ) == 1 : correct += 0.3
+          elif abs( pred - answer_list[i] ) == 3 : correct -= 0.5
           
-model_accuracy = round( ( correct / len( answer_list ) ) * 100, 2)
+    model_accuracy = round( ( correct / len( answer_list ) ) * 100, 2)
                         
-results.to_csv("result.csv",index=False)
-accuracy_file_name = os.path.join( saved_model_name, "{cp}_accuracy_{acc}.txt".format( cp = best_weight_name, acc = model_accuracy ) )
-f = open( accuracy_file_name, 'w' )
-f.close()
+    results.to_csv("result.csv", index=False)
+    accuracy_file_name = os.path.join( saved_model_name, "{cp}_accuracy_{acc}.txt".format( cp = best_weight_name, acc = model_accuracy ) )
+    f = open( accuracy_file_name, 'w' )
+    f.close()
+
+# 그냥 모델 세이브
+test_and_save( saved_model_name, best_weight_name )
+
+# best weights 적용
+model.load_weights(best_weight)
+
+# save best model
+saved_bestmodel_path = os.path.join( file_dir_path, 'saved_bestmodel' )
+model_num = len( os.listdir( saved_bestmodel_path ) )
+saved_bestmodel_name = os.path.join( saved_bestmodel_path, 'model_' + str(model_num) )
+model.save( saved_bestmodel_name )
+
+# best model save
+test_and_save( saved_bestmodel_name, best_weight_name )
