@@ -18,8 +18,8 @@ pred_result_dir_path = os.path.join( file_dir_path, 'pred_results' )
 
 
 # generator / img size / 클래스 등 기본사항 설정
-img_h = 256
-img_w = 256
+img_h = 300
+img_w = 300
 num_classes = 4
 classes = [ 'cutest',
             'prettyCute',
@@ -29,9 +29,9 @@ classes = [ 'cutest',
 SEED = 1234
 tf.random.set_seed( SEED ) 
 
-test_data_generator = ImageDataGenerator( rescale=1./255 )
+test_data_generator = ImageDataGenerator( rescale=1./299 )
 test_generator = test_data_generator.flow_from_directory( pred_image_dir_path,
-                                                          target_size=(256, 256),
+                                                          target_size=(300, 300),
                                                           batch_size=1,
                                                           shuffle=False,
                                                           class_mode=None,
@@ -44,8 +44,8 @@ model_name = 'saved_model'
 model_dir_path = os.path.join( file_dir_path, 'saved_model' )
 model_dir_path = os.path.join( model_dir_path, model_dir_name )
 
-model_weights_dir_name = 2
-model_weights_name = 'cp-val_acc-0.650000.ckpt'
+model_weights_dir_name = 8
+model_weights_name = 'cp-val_acc-0.700000.ckpt'
 model_weights_path = os.path.join( file_dir_path, 'checkpoints' )
 model_weights_path = os.path.join( model_weights_path, '{dir_name}\\{model_name}'
                                                 .format( dir_name=model_weights_dir_name, model_name=model_weights_name ) ) # 원하는 가중치 이름 넣기

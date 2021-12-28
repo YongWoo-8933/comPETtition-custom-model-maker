@@ -15,8 +15,8 @@ from tensorflow.python.keras.layers.normalization_v2 import BatchNormalization
 
 # 배치, 클래스 등 기본 설정
 Batch_size = 16
-img_h = 300
-img_w = 300
+img_h = 260
+img_w = 260
 num_classes = 4
 classes = [ 'cutest', # 0
             'prettyCute', # 1
@@ -114,74 +114,17 @@ valid_gen = valid_data_gen.flow_from_directory( validation_path,
 
 
 # 맞춤형 모델
-
-# model = Sequential()
-
-# model.add(Conv2D(32, kernel_size=(3,3), padding='same', input_shape=(img_h,img_w,3)))
-# model.add(BatchNormalization())
-# model.add(Activation('relu'))
-# model.add(Conv2D(64, kernel_size=(3,3), padding='same'))
-# model.add(BatchNormalization())
-# model.add(Activation('relu'))
-# model.add(Conv2D(64, kernel_size=(3,3), padding='same'))
-# model.add(BatchNormalization())
-# model.add(Activation('relu'))
-
-# model.add(MaxPooling2D(pool_size = (2,2)))
-
-# model.add(Conv2D(64, kernel_size=(3,3), padding='same'))
-# model.add(BatchNormalization())
-# model.add(Activation('relu'))
-# model.add(Conv2D(64, kernel_size=(3,3), padding='same'))
-# model.add(BatchNormalization())
-# model.add(Activation('relu'))
-# model.add(Conv2D(64, kernel_size=(3,3), padding='same'))
-# model.add(BatchNormalization())
-# model.add(Activation('relu'))
-
-# model.add(MaxPooling2D(pool_size = (2,2)))
-# model.add(GlobalAveragePooling2D())
-# model.add(Flatten())
-# model.add(Dense(64))
-# model.add(Dense(units=4, activation='softmax'))
-
-
-# MobileNetV3 Model import
-# MobileNetV2_model = tf.keras.applications.MobileNetV2( weights='imagenet-21k',
-#                                                        include_top=False,
-#                                                        input_shape=(img_h, img_w, 3))
-
-# model_dir_path = os.path.join( file_dir_path, 'saved_model' )
-# model_dir_path = os.path.join( model_dir_path, 'regnety400mf_classification_1' )
-
-base_layer = hub.load("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b3/classification/2")
-# base_layer = hub.KerasLayer("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_s/feature_vector/2", trainable=False)
-base_layer = hub.KerasLayer("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b3/feature_vector/2", trainable=False)
+base_layer = hub.load("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b2/classification/2")
+base_layer = hub.KerasLayer("https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_ft1k_b2/feature_vector/2", trainable=False)
 model = tf.keras.Sequential([
-      #   tf.keras.layers.InputLayer(384,384,3),
         base_layer,
         Dropout(0.2),
-        Dense(units=256, activation='relu'),
+        Dense(units=64, activation='relu'),
         Dropout(0.2),
         Dense(units=4, activation='softmax')
     ])
 
 model.build( input_shape=[None, img_w, img_h, 3] ) 
-
-# The last 15 layers fine tune
-# for layer in MobileNetV2_model.layers[:]:
-#     layer.trainable = False
-
-# x = MobileNetV2_model.output
-# x = GlobalAveragePooling2D()(x)
-# x = Flatten()(x)
-
-# x = Dense(units = 1024, activation='relu')(x)
-# x = Dropout(0.3)(x)
-# x = Dense(units = 256, activation='relu')(x)
-# x = Dropout(0.3)(x)
-# output  = Dense(units=4, activation='softmax')(x)
-# model = Model( MobileNetV2_model.input, output )
 
 loss = tf.keras.losses.CategoricalCrossentropy()
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.00015)
@@ -191,8 +134,8 @@ model.summary()
 
 # callback 함수 설정 : lrr, cp
 lrr = ReduceLROnPlateau(monitor='val_accuracy', 
-                        factor=0.8, 
-                        patience=4, 
+                        factor=0.5, 
+                        patience=5, 
                         verbose=1, 
                         min_lr=0.00001 )
 
@@ -216,7 +159,7 @@ transfer_learning_history = model.fit( train_gen,
                                        steps_per_epoch=STEP_SIZE_TRAIN,
                                        validation_data=valid_gen,
                                        validation_steps=STEP_SIZE_VALID,
-                                       epochs=40,
+                                       epochs=30,
                                        callbacks=callbacks,
                                        class_weight=None
 )
